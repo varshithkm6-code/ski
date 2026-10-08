@@ -24,7 +24,6 @@ model User {
   analyses       Analysis[]
   progressEvents ProgressEvent[]
 
-  @@index([email])
   @@map("users")
 }
 

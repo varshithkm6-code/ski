@@ -10,7 +10,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:e2e": "playwright test",
-        "postinstall": "prisma generate",
+        "postinstall": "node scripts/postinstall.js",
         "db:migrate": "prisma migrate dev",
         "db:generate": "prisma generate",
         "db:generate:mongo": "prisma generate --schema=prisma/schema.mongo.prisma",
