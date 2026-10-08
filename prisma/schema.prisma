@@ -1,0 +1,212 @@
+// SkillBridge Prisma Schema (SQLite for local zero-config, Postgres-compatible structure)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  passwordHash   String?
+  role           String    @default("CANDIDATE")
+  cohortId       String?
+  analyticsOptIn Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  profile        Profile?
+  analyses       Analysis[]
+  progressEvents ProgressEvent[]
+
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Profile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  rawTextEnc    String?
+  parsedData    Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileSkills ProfileSkill[]
+
+  @@map("profiles")
+}
+
+model ProfileSkill {
+  id            String       @id @default(cuid())
+  profileId     String
+  skillId       String
+  proficiency   Int
+  evidenceType  String       @default("SELF_RATED")
+  evidenceNotes String?
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id])
+
+  @@unique([profileId, skillId])
+  @@map("profile_skills")
+}
+
+model Skill {
+  id            String        @id @default(cuid())
+  canonicalName String        @unique
+  category      String        @default("TECHNICAL")
+  aliases       String        @default("[]")
+  description   String?
+
+  profileSkills ProfileSkill[]
+  roleSkills    RoleSkill[]
+  gaps          Gap[]
+  roadmapItems  RoadmapItem[]
+
+  @@map("skills")
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  seniority   String    @default("ENTRY")
+  description String?
+  isCustom    Boolean   @default(false)
+  createdById String?
+
+  roleSkills RoleSkill[]
+  analyses   Analysis[]
+
+  @@map("roles")
+}
+
+model RoleSkill {
+  id             String  @id @default(cuid())
+  roleId         String
+  skillId        String
+  required       Boolean @default(true)
+  weight         Float   @default(1.0)
+  minProficiency Int     @default(3)
+
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id])
+
+  @@unique([roleId, skillId])
+  @@map("role_skills")
+}
+
+model Analysis {
+  id         String   @id @default(cuid())
+  userId     String
+  roleId     String
+  score      Float
+  breakdown  Json
+  aiInsights Json?
+  confidence Float    @default(1.0)
+  createdAt  DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role          @relation(fields: [roleId], references: [id])
+  gaps         Gap[]
+  roadmapItems RoadmapItem[]
+
+  @@map("analyses")
+}
+
+model Gap {
+  id                  String    @id @default(cuid())
+  analysisId          String
+  skillId             String
+  status              String    @default("MISSING")
+  userProficiency     Int       @default(0)
+  requiredProficiency Int       @default(3)
+  evidenceStrength    Float     @default(0)
+  weight              Float     @default(1.0)
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  skill    Skill    @relation(fields: [skillId], references: [id])
+
+  @@map("gaps")
+}
+
+model RoadmapItem {
+  id             String       @id @default(cuid())
+  analysisId     String
+  skillId        String
+  phase          String       @default("DAYS_30")
+  title          String
+  whyItMatters   String
+  resourceTypes  String       @default("[]")
+  estimatedHours Int
+  milestone      String
+  projectIdea    String?
+  completed      Boolean      @default(false)
+  completedAt    DateTime?
+  sortOrder      Int          @default(0)
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  skill    Skill    @relation(fields: [skillId], references: [id])
+
+  @@map("roadmap_items")
+}
+
+model ProgressEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  analysisId String?
+  eventType  String
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("progress_events")
+}
